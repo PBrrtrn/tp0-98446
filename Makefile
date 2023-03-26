@@ -34,6 +34,17 @@ docker-compose-down:
 	docker compose -f docker-compose-dev.yaml down
 .PHONY: docker-compose-down
 
+docker-image-test:
+	docker build -f netcat-test/Dockerfile -t "netcat-test:latest" .
+.PHONY: docker-compose-build-test
+
+docker-compose-test: $(test-string)
+	docker compose -f docker-compose-dev.yaml run -e STRING=$(test-string) netcat -d --build
+.PHONY: docker-compose-test
+
 docker-compose-logs:
 	docker compose -f docker-compose-dev.yaml logs -f
 .PHONY: docker-compose-logs
+
+%:
+	@:
