@@ -1,6 +1,9 @@
 import socket
 import logging
 
+from common.utils import Bet
+from common.utils import store_bets
+
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -34,12 +37,11 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            bet = self.__receive_bet(client_sock)
+            store_bets([bet])
+            logging.info(f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}")
+
+            client_sock.send("OK\n".encode('utf-8'))
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
@@ -58,6 +60,19 @@ class Server:
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
+
+    def __receive_bet(self, client_sock):
+        # TODO: Modify the receive to avoid short-reads
+        raw_msg = client_sock.recv(128).rstrip().decode('utf-8')
+        logging.info(f'action: receive_apuesta | result: read {len(raw_msg)}')
+
+        first_name = raw_msg[0:32].lstrip()
+        last_name = raw_msg[32:64].lstrip()
+        document = raw_msg[64:72].lstrip()
+        birthdate = raw_msg[72:88].lstrip()
+        number = raw_msg[88:96].lstrip()
+
+        return Bet("0", first_name, last_name, document, birthdate, number)
 
     def die(self):
         logging.info('action: shutdown_socket | result: in_progress')

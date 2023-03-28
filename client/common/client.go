@@ -9,6 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const SERIALIZED_BET_LEN = 98
+
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID            string
@@ -48,6 +50,60 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
+func (self *Client) SendBet(bet Bet) bool {
+	msgID := 1
+
+	serializedBet := fmt.Sprintf("%32s%32s%8d%16s%8d",
+		bet.FirstName,
+		bet.LastName,
+		bet.Document,
+		bet.Birthdate,
+		bet.Number,
+	)
+
+	self.createClientSocket()
+	n_sent, err := fmt.Fprintf(
+		self.conn,
+		"%v%v\n",
+		serializedBet,
+		msgID,
+	)
+
+	msg, err := bufio.NewReader(self.conn).ReadString('\n')
+	msgID++
+	self.conn.Close()
+
+	if n_sent != SERIALIZED_BET_LEN {
+		log.Errorf("action: apuesta_enviada | result: fail | short write: sent %v expected %v",
+			self.config.ID,
+			n_sent,
+			SERIALIZED_BET_LEN,
+		)
+		return false
+	}
+
+	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+		bet.Document,
+		bet.Number,
+	)
+
+	if err != nil {
+		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+            self.config.ID,
+			err,
+		)
+		return false
+	}
+
+	log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
+        self.config.ID,
+        msg,
+    )
+
+    return true
+}
+
+/*
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// autoincremental msgID to identify every message sent
@@ -97,3 +153,4 @@ loop:
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
+*/

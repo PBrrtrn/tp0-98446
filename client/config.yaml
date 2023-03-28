@@ -6,3 +6,9 @@ loop:
   period: "5s"
 log:
   level: "info"
+apuesta:
+  nombre: "Pablo"
+  apellido: "Berrotaran"
+  documento: 39242646
+  nacimiento: "1995-08-23"
+  numero: 1000
