@@ -50,7 +50,11 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (self *Client) SendBet(bet Bet) bool {
+func (self *Client) SendBets(bets []Bet) {
+	log.Infof("SEND %d BETS", len(bets))
+}
+
+func (self *Client) _SendBet(bet Bet) bool {
 	msgID := 1
 
 	serializedBet := fmt.Sprintf("%32s%32s%8d%16s%8d",

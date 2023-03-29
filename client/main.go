@@ -113,14 +113,14 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	bet := common.Bet{
-		FirstName: v.GetString("apuesta.nombre"),
-		LastName:  v.GetString("apuesta.apellido"),
-		Document:  v.GetInt32("apuesta.documento"),
-		Birthdate: v.GetString("apuesta.nacimiento"),
-		Number:    v.GetInt32("apuesta.numero"),
+	betsReader := common.BetsReader {}
+	filename := "./build/.data/agency-1.csv"
+	bets, err := betsReader.ReadBets(filename)
+	if err != nil {
+		log.Errorf("Could not read file %s (err: %s)", filename, err)
+		return
 	}
 
 	client := common.NewClient(clientConfig)
-	client.SendBet(bet)
+	client.SendBets(bets)
 }

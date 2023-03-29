@@ -22,6 +22,8 @@ services:
       - testing_net
     depends_on:
       - server
+    volumes:
+      - ./client:/build
 
 networks:
   testing_net:
