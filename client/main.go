@@ -114,7 +114,7 @@ func main() {
 	}
 
 	betsReader := common.BetsReader {}
-	filename := "./build/.data/agency-1.csv"
+	filename := "./data/agency-1.csv"
 	bets, err := betsReader.ReadBets(filename)
 	if err != nil {
 		log.Errorf("Could not read file %s (err: %s)", filename, err)
