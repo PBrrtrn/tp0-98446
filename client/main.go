@@ -109,12 +109,13 @@ func main() {
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
 		ID:            v.GetString("id"),
+		MaxBatchBytes: v.GetInt("batch.max-bytes"),
 		LoopLapse:     v.GetDuration("loop.lapse"),
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
 	betsReader := common.BetsReader {}
-	filename := "./data/agency-1.csv"
+	filename := v.GetString("bets.file")
 	bets, err := betsReader.ReadBets(filename)
 	if err != nil {
 		log.Errorf("Could not read file %s (err: %s)", filename, err)

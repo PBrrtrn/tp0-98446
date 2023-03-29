@@ -6,11 +6,7 @@ loop:
   period: "5s"
 log:
   level: "info"
-apuesta:
-  nombre: "Pablo"
-  apellido: "Berrotaran"
-  documento: 39242646
-  nacimiento: "1995-08-23"
-  numero: 1000
+bets:
+  file: "./data/agency-1.csv"
 batch:
-  max-items: 81
+  max-bytes: 8000

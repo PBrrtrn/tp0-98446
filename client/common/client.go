@@ -1,6 +1,8 @@
 package common
 
 import (
+	"bytes"
+	"encoding/binary"
 	"bufio"
 	"fmt"
 	"net"
@@ -10,11 +12,13 @@ import (
 )
 
 const SERIALIZED_BET_LEN = 98
+const BATCH_SIZE_INDICATOR_LEN = 4
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
+	MaxBatchBytes int
 	LoopLapse     time.Duration
 	LoopPeriod    time.Duration
 }
@@ -51,7 +55,58 @@ func (c *Client) createClientSocket() error {
 }
 
 func (self *Client) SendBets(bets []Bet) {
-	log.Infof("SEND %d BETS", len(bets))
+	log.Infof("SEND %d BETS IN BATCHES OF %dkB", len(bets), self.config.MaxBatchBytes)
+
+	totalSentBets := 0
+	for totalSentBets < len(bets) {
+		sentBets, err := self.sendBatch(bets, totalSentBets)
+
+		if err != nil {
+			log.Errorf("action: enviar_batch | result: fail | err: %v", err)
+			// Posiblemente notificar error al server
+			return
+		} else {
+			totalSentBets += sentBets
+		}
+	}
+}
+
+func (self *Client) sendBatch(bets []Bet, int batchStart) (int, error) {
+	batch := []byte {}
+
+	currentBet := batchStart
+	for currentBet < len(bets) {
+		serializedBet := self.serializeBet(bets[currentBet])
+
+		if BATCH_SIZE_INDICATOR_LEN + len(batch) + len(serializedBet) < self.config.MaxBatchBytes {
+			batch = append(batch, serializedBet)
+			currentBet++
+		} else {
+			break
+		}
+	}
+
+	betsInBatch := currentBet - batchStart
+
+	return betsInBatch, nil
+}
+
+func (self *Client) serializeBet(bet Bet) []byte {
+	buffer := new(bytes.Buffer)
+
+	binary.Write(buffer, bytes.BigEndian, len(bet.FirstName))
+	binary.Write(buffer, bytes.BigEndian, bet.FirstName)
+
+	binary.Write(buffer, bytes.BigEndian, len(bet.LastName))
+	binary.Write(buffer, bytes.BigEndian, bet.LastName)
+
+	binary.Write(buffer, bytes.BigEndian, len(bet.Birthdate))
+	binary.Write(buffer, bytes.BigEndian, bet.Birthdate)
+
+	binary.Write(buffer, bytes.BigEndian, bet.Document)
+	binary.Write(buffer, bytes.BigEndian, bet.Number)
+
+	return buffer.Bytes()
 }
 
 func (self *Client) _SendBet(bet Bet) bool {
@@ -68,9 +123,8 @@ func (self *Client) _SendBet(bet Bet) bool {
 	self.createClientSocket()
 	n_sent, err := fmt.Fprintf(
 		self.conn,
-		"%v%v\n",
+		"%x",
 		serializedBet,
-		msgID,
 	)
 
 	msg, err := bufio.NewReader(self.conn).ReadString('\n')
