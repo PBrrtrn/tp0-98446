@@ -1,9 +1,9 @@
 package common
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
-	"bufio"
 	"fmt"
 	"net"
 	"time"
@@ -45,7 +45,7 @@ func (c *Client) createClientSocket() error {
 	conn, err := net.Dial("tcp", c.config.ServerAddress)
 	if err != nil {
 		log.Fatalf(
-	        "action: connect | result: fail | client_id: %v | error: %v",
+			"action: connect | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
 		)
@@ -71,15 +71,15 @@ func (self *Client) SendBets(bets []Bet) {
 	}
 }
 
-func (self *Client) sendBatch(bets []Bet, int batchStart) (int, error) {
-	batch := []byte {}
+func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
+	batch := []byte{}
 
 	currentBet := batchStart
 	for currentBet < len(bets) {
 		serializedBet := self.serializeBet(bets[currentBet])
 
-		if BATCH_SIZE_INDICATOR_LEN + len(batch) + len(serializedBet) < self.config.MaxBatchBytes {
-			batch = append(batch, serializedBet)
+		if BATCH_SIZE_INDICATOR_LEN+len(batch)+len(serializedBet) < self.config.MaxBatchBytes {
+			batch = append(batch, serializedBet...)
 			currentBet++
 		} else {
 			break
@@ -121,7 +121,7 @@ func (self *Client) _SendBet(bet Bet) bool {
 	)
 
 	self.createClientSocket()
-	n_sent, err := fmt.Fprintf(
+	nSent, err := fmt.Fprintf(
 		self.conn,
 		"%x",
 		serializedBet,
@@ -131,10 +131,10 @@ func (self *Client) _SendBet(bet Bet) bool {
 	msgID++
 	self.conn.Close()
 
-	if n_sent != SERIALIZED_BET_LEN {
+	if nSent != SERIALIZED_BET_LEN {
 		log.Errorf("action: apuesta_enviada | result: fail | short write: sent %v expected %v",
 			self.config.ID,
-			n_sent,
+			nSent,
 			SERIALIZED_BET_LEN,
 		)
 		return false
@@ -147,18 +147,18 @@ func (self *Client) _SendBet(bet Bet) bool {
 
 	if err != nil {
 		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-            self.config.ID,
+			self.config.ID,
 			err,
 		)
 		return false
 	}
 
 	log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-        self.config.ID,
-        msg,
-    )
+		self.config.ID,
+		msg,
+	)
 
-    return true
+	return true
 }
 
 /*
