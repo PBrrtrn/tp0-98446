@@ -2,14 +2,12 @@ package common
 
 import (
 	"bufio"
-	"fmt"
 	"net"
 	"time"
+	"encoding/binary"
 
 	log "github.com/sirupsen/logrus"
 )
-
-const SERIALIZED_BET_LEN = 98
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
@@ -53,31 +51,22 @@ func (c *Client) createClientSocket() error {
 func (self *Client) SendBet(bet Bet) bool {
 	msgID := 1
 
-	serializedBet := fmt.Sprintf("%32s%32s%8d%16s%8d",
-		bet.FirstName,
-		bet.LastName,
-		bet.Document,
-		bet.Birthdate,
-		bet.Number,
-	)
+	serializedBet := self.serializeBet(bet)
+	log.Debugf("action: apuesta_serializada | apuesta: %x", serializedBet)
 
 	self.createClientSocket()
-	n_sent, err := fmt.Fprintf(
-		self.conn,
-		"%v%v\n",
-		serializedBet,
-		msgID,
-	)
+
+	n_sent, err := self.conn.Write(serializedBet)
 
 	msg, err := bufio.NewReader(self.conn).ReadString('\n')
 	msgID++
 	self.conn.Close()
 
-	if n_sent != SERIALIZED_BET_LEN {
+	if n_sent != len(serializedBet) {
 		log.Errorf("action: apuesta_enviada | result: fail | short write: sent %v expected %v",
 			self.config.ID,
 			n_sent,
-			SERIALIZED_BET_LEN,
+			len(serializedBet),
 		)
 		return false
 	}
@@ -101,6 +90,41 @@ func (self *Client) SendBet(bet Bet) bool {
     )
 
     return true
+}
+
+func (self *Client) serializeBet(bet Bet) []byte {
+	serializedBet := []byte {}
+
+	firstNameLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(firstNameLenBytes, uint32(len(bet.FirstName)))
+	serializedBet = append(serializedBet, firstNameLenBytes...)
+
+	firstNameBytes := []byte(bet.FirstName)
+	serializedBet = append(serializedBet, firstNameBytes...)
+
+	lastNameLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(lastNameLenBytes, uint32(len(bet.LastName)))
+	serializedBet = append(serializedBet, lastNameLenBytes...)
+
+	lastNameBytes := []byte(bet.LastName)
+	serializedBet = append(serializedBet, lastNameBytes...)
+
+	birthdateLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(birthdateLenBytes, uint32(len(bet.Birthdate)))
+	serializedBet = append(serializedBet, birthdateLenBytes...)
+
+	birthdateBytes := []byte(bet.Birthdate)
+	serializedBet = append(serializedBet, birthdateBytes...)
+
+	documentBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(documentBytes, uint32(bet.Document))
+	serializedBet = append(serializedBet, documentBytes...)
+
+	numberBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(numberBytes, uint32(bet.Number))
+	serializedBet = append(serializedBet, numberBytes...)
+
+	return serializedBet
 }
 
 /*

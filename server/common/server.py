@@ -63,14 +63,30 @@ class Server:
 
     def __receive_bet(self, client_sock):
         # TODO: Modify the receive to avoid short-reads
-        raw_msg = client_sock.recv(128).rstrip().decode('utf-8')
+        raw_msg = client_sock.recv(8000).rstrip()
         logging.info(f'action: receive_apuesta | result: read {len(raw_msg)}')
 
-        first_name = raw_msg[0:32].lstrip()
-        last_name = raw_msg[32:64].lstrip()
-        document = raw_msg[64:72].lstrip()
-        birthdate = raw_msg[72:88].lstrip()
-        number = raw_msg[88:96].lstrip()
+        # TODO: Hacer una funcion readVariableLengthString
+        seek = 0
+        first_name_len = int.from_bytes(raw_msg[seek:seek+4], 'big')
+        seek += 4
+        first_name = raw_msg[seek:seek+first_name_len].decode('utf-8')
+        seek += first_name_len
+
+        last_name_len = int.from_bytes(raw_msg[seek : seek+4], 'big')
+        seek += 4
+        last_name = raw_msg[seek:seek+last_name_len].decode('utf-8')
+        seek += last_name_len
+
+        birthdate_len = int.from_bytes(raw_msg[seek : seek+4], 'big')
+        seek += 4
+        birthdate = raw_msg[seek : seek + birthdate_len].decode('utf-8')
+        seek += birthdate_len
+
+        document = int.from_bytes(raw_msg[seek : seek+4], 'big')
+        seek += 4
+
+        number = int.from_bytes(raw_msg[seek : seek+4], 'big')
 
         return Bet("0", first_name, last_name, document, birthdate, number)
 
