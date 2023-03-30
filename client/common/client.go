@@ -58,8 +58,6 @@ func (self *Client) ParticipateInLottery(bets []Bet) {
 }
 
 func (self *Client) sendAllBets(bets []Bet) {
-	log.Infof("SEND %d BETS IN BATCHES OF %dkB", len(bets), self.config.MaxBatchBytes)
-
 	totalSentBets := 0
 	for totalSentBets < len(bets) {
 		sentBets, err := self.sendBatch(bets, totalSentBets)
@@ -95,15 +93,10 @@ func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
 
 	batch = append(betsInBatchBytes, batch...)
 
-	log.Debugf(
-		"BATCH OF %d ENTRIES, SIZE %v",
-		binary.BigEndian.Uint32(batch[0:4]),
-		len(batch),
-	)
-
 	// Send batch
 	self.createClientSocket()
 	nSent, err := self.conn.Write(batch)
+	bufio.NewReader(self.conn).ReadString('\n')
 	self.conn.Close()
 
 	if nSent != len(batch) {
