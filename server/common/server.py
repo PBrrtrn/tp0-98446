@@ -4,8 +4,9 @@ import logging
 from common.utils import Bet
 from common.utils import store_bets
 
-
 class Server:
+    MAX_BATCH_SIZE = 8000
+
     def __init__(self, port, listen_backlog):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -60,7 +61,7 @@ class Server:
             client_sock.close()
 
     def __receive_batch(self, client_sock):
-        raw_batch = client_sock.recv(8000).rstrip()
+        raw_batch = client_sock.recv(self.MAX_BATCH_SIZE).rstrip()
 
         seek = 0
         n_bets_in_batch = int.from_bytes(raw_batch[seek:seek+4], 'big')
