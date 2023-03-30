@@ -115,7 +115,7 @@ func main() {
 	}
 
 	betsReader := common.BetsReader {}
-	filename := v.GetString("bets.file")
+	filename := v.GetString("bets.file") + v.GetString("id") + ".csv"
 	bets, err := betsReader.ReadBets(filename)
 	if err != nil {
 		log.Errorf("Could not read file %s (err: %s)", filename, err)

@@ -133,3 +133,69 @@ La Parte 2 requiere una sección donde se explique el protocolo de comunicación
 La Parte 3 requiere una sección que expliquen los mecanismos de sincronización utilizados.
 
 Finalmente, se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección provistos [en el campus](https://campusgrado.fi.uba.ar/mod/page/view.php?id=73393).
+
+# Resolucion de los ejercicios
+
+## Parte 1
+
+### Ejercicio 1
+Para ejecutar el ejercicio 1, basta con ejecutar `make docker-compose-up`, ya que el segundo cliente ya se encuentra definido en el docker-compose.
+
+### Ejercicio 1.1
+Para crear el archivo docker-compose con multiples clientes, se debe ejecutar el script provisto con el comando `python3 create_docker_compose_definition {N_CLIENTES}`, y luego se podrá poner a correr los N_CLIENTES containers con `make docker-compose-up`
+
+### Ejercicio 2
+La solución se encuentra integrada al docker-compose, y se levantarán los volumenes al iniciar
+
+### Ejercicio 3
+Para ejecutar la prueba, primero hacer build de la imagen del dockerfile de netcat-test con el script de makefile ejecutando `make docker-image-test`. Luego, la prueba podrá ejecutarse con `make docker-compose-test test-string={TEST_STRING}`.
+
+La prueba correrá con el string provisto e imprimirá el resultado por consola
+
+### Ejercicio 4
+No es necesario hacer nada más que ejecutar con `make docker-compose-up` y, de desearlo, enviar la señal SIGTERM a los contenedores.
+
+## Parte 2
+Para la representación de las apuestas, se planteó un esquema de paquete mixto, donde una apuesta se serializa a formato bytes. La forma de una apuesta serializada es la siguiente:
+
+	- 4 bytes que representan un entero con el numero de bytes del primer nombre
+	- Un numero variable de bytes que forman los caracteres del primer nombre
+	- 4 bytes que representan un entero con el numero de bytes del apellido
+	- Un numero variable de bytes que forman los caracteres del apellido
+	- 4 bytes que representan un entero con el numero de bytes de la fecha de nacimiento
+	- Un numero variable de bytes que forman los caracteres de la fecha de nacimiento
+	- 4 bytes que representan el número de documento
+	- 4 bytes que representan el número de la apuesta
+
+Todos los números reciben representación big-endian, y las cadenas son encodeadas a utf-8
+
+### Ejercicio 5
+Para llevar a cabo este ejercicio solo se envió una apuesta, por lo que el protocolo actúa de forma reducida. El cliente envía la apuesta serializada y recibe un mensaje "OK\n" de confirmación por parte del servidor, luego cierra la conexión y termina.
+
+### Ejercicio 6
+Para lograr la transmisión por batches, se amplía el protocolo. Ahora, el cliente inicia la conexión y la mantiene abierte mientras transmite sus apuestas de a batches que no pueden exceder los 8kB por batch (configurable en el archivo `config.yaml`).
+
+Cada batch tiene la forma de un entero de 4 bytes en formato BigEndian con el número de apuestas que contiene, seguido de las apuestas serializadas como una terna de bytes, cada una siguiendo el formato enunciado en el protocolo.
+
+Luego de cada batch enviado, el cliente espera la confirmación del servidor para continuar enviando el próximo. Cuando el cliente ya no tiene batches para enviar, envía un byte '\04' (end of transmission) para avisar al servidor.
+
+### Ejercicio 7
+Para poder ejecutar el programa con varios clientes, se vuelve a usar el script del **ejercicio 1.1**. También, es necesario descomprimir el archivo `./.data/dataset.zip` al directorio `./client/.data`, manteniendo intactos los nombres de los CSV. El directorio será luego inyectado al cliente mediante un volumen, y el archivo correcto será leido a partir de la configuración del ambiante.
+
+El protocolo ahora cambia, pidiendo primero una identificación por parte de los clientes después de conectarse y antes de empezar a enviar batches. Una vez que el cliente envió su ID (En la forma de un solo byte casteable a caracter con encodeo utf-8), puede comenzar a enviar los batches uno atrás del otro con el mismo formato del **ejercicio 6**, recibiendo una confirmación por batch.
+
+Al terminar de enviar, se espera que el cliente consulte por su número de ganadores. Para esto, el cliente vuelve a enviar su ID con la misma representación. Una vez que el servidor haya terminado de procesar los batches de los demás clientes, responderá con un entero de 4 bytes big-endian que representa el número de ganadores de la agencia. Luego de esto, el cliente puede terminar la conexión.
+
+### Ejercicio 8
+Se resolvió el problema de procesar las conexiones con los clientes en paralelo haciendo uso del modelo de mensajes. Para esto, se usa la clase `ClientProcess`, que encapsula un proceso y expone dos pipes full-duplex necesarios para comunicarse con ese proceso.
+
+De esta forma, al comenzar a correr, el servidor crea un `ClientProcess` por cada cliente, y los pone a correr. Luego, itera sobre los `ClientProcess` hasta recibir, por pipe, de cada uno de ellos, un mensaje que contiene el ID de la agencia de la cual el proceso acaba de terminar de recibir los batches. Por la naturaleza bloqueante de recibir mediante un pipe, el servidor no iniciará la lotería hasta no haber recibido mensajes de cada proceso, por lo que esta estructura se comporta como un semáforo.
+
+Una vez que recibe mensajes de todos los clientes, el servidor procede con la lotería y envía por pipe a cada proceso un diccionario {"id-agencia": N_GANADORES}, y cierra la conexión.
+
+Por su parte, cada `ClientProcess` lleva a cabo los pasos detallados en el **Ejercicio 7** hasta haber terminado de recibir todas las apuestas de su agencia. Una vez que todas las apuestas son recibidas, el `ClientProcess` notifica al servidor con su pipe, y empieza a esperar a recibir del servidor el diccionario de ganadores. Una vez recibido el diccionario de ganadores, `ClientProcess` notifica al cliente del otro lado de la conexión cuantos ganadores tuvo y cierra su socket, quedando listo para ser joineado.
+
+### TODO:
+- No se considera el caso en que un cliente pida los ganadores antes de enviar sus apuestas. Para resolver esto, podría implementarse un formato de mensajes de tipo TLV, donde cada mensaje tiene un header con un símbolo que indique si el cliente está enviando un batch o pidiendo resultados. El servidor debería implementar entonces un loop de recibir mensajes que notifique al cliente cuando está enviando requests en un orden ilegal.
+
+- Falta manejo ordenado de errores internos del servidor. Actualmente si el servidor falla dejará colgado al cliente, en lugar de notificar que algo salió mal y que por ende no es posible llevar a cabo la lotería.

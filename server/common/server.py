@@ -35,6 +35,8 @@ class Server:
             client_process.send(winners)
             client_process.shutdown()
 
+        self.die()
+
 
 
     def __accept_new_connection(self):

@@ -7,6 +7,6 @@ loop:
 log:
   level: "info"
 bets:
-  file: "./data/agency-1.csv"
+  file: "./data/agency-"
 batch:
   max-bytes: 8000
