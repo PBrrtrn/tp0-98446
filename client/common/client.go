@@ -54,7 +54,17 @@ func (c *Client) createClientSocket() error {
 }
 
 func (self *Client) ParticipateInLottery(bets []Bet) {
+	self.createClientSocket()
+	self.sendId()
 	self.sendAllBets(bets)
+	self.notifyFinishedSending()
+	self.receiveLotteryWinners()
+	self.conn.Close()
+}
+
+func (self *Client) sendId() {
+	idByte := []byte(self.config.ID)
+	self.conn.Write(idByte)
 }
 
 func (self *Client) sendAllBets(bets []Bet) {
@@ -71,6 +81,27 @@ func (self *Client) sendAllBets(bets []Bet) {
 	}
 }
 
+func (self *Client) notifyFinishedSending() {
+	delimiterByte := []byte {4}
+	self.conn.Write(delimiterByte) // TODO: Chequear short write?
+}
+
+func (self *Client) receiveLotteryWinners() {
+	log.Debugf("Asking for lottery winners")
+	self.sendId()
+
+	nWinnersBytes := make([]byte, 4)
+	self.conn.Read(nWinnersBytes) // TODO: Manejar short-read y errores
+
+	nWinners := binary.BigEndian.Uint32(nWinnersBytes)
+	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", nWinners)
+}
+
+/*  sendBatch receives a slice of Bet structs and the index of the Bet that should
+be the first one in the batch, and serializes the following Bets into a batch of
+size < MaxBatchBytes
+
+MaxBatchBytes may be configured in the ClientConfiguration    */
 func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
 	// Serialize batch
 	batch := []byte{}
@@ -94,10 +125,8 @@ func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
 	batch = append(betsInBatchBytes, batch...)
 
 	// Send batch
-	self.createClientSocket()
 	nSent, err := self.conn.Write(batch)
 	bufio.NewReader(self.conn).ReadString('\n')
-	self.conn.Close()
 
 	if nSent != len(batch) {
 		log.Errorf("action: send_batch | result: fail | short write: sent %v expected %v",

@@ -2,16 +2,19 @@ import socket
 import logging
 
 from common.utils import Bet
-from common.utils import store_bets
+from common.utils import store_bets, load_bets, has_won
 
 class Server:
     MAX_BATCH_SIZE = 8000
+    N_CLIENTS = 1
 
     def __init__(self, port, listen_backlog):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+
+        self._finished_clients = set()
         self._running = True
 
     def run(self):
@@ -22,13 +25,21 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
-
-        while self._running:
+        client_sockets = []
+        while len(self._finished_clients) < self.N_CLIENTS:
             try:
                 client_sock = self.__accept_new_connection()
-                self.__handle_client_connection(client_sock)
+                self.__receive_bets(client_sock)
+                client_sockets.append(client_sock)
             except OSError:
                 logging.debug('action: accept_and_handle_connection | result: interrupted')
+
+        logging.debug('action: sorteo | result: success')
+        for client_socket in client_sockets:
+            self.__handle_lottery_end(client_socket)
+            client_socket.close()
+
+
 
     def __accept_new_connection(self):
         """
@@ -44,7 +55,10 @@ class Server:
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
 
-    def __handle_client_connection(self, client_sock):
+
+
+
+    def __receive_bets(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
 
@@ -52,17 +66,42 @@ class Server:
         client socket will also be closed
         """
         try:
-            batch = self.__receive_batch(client_sock)
-            store_bets(batch)
-            client_sock.send("OK\n".encode('utf-8'))
+            client_id = self.__receive_client_id(client_sock)
+            while True:
+                batch, finished = self.__receive_client_message(client_sock, client_id)
+                if finished:
+                    break
+
+                store_bets(batch)
+                client_sock.send("OK\n".encode('utf-8'))
+
+            # Marcar el cliente como terminado
+            self._finished_clients.add(client_id)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
-        finally:
-            client_sock.close()
 
-    def __receive_batch(self, client_sock):
-        raw_batch = client_sock.recv(self.MAX_BATCH_SIZE).rstrip()
 
+
+
+    def __receive_client_id(self, client_sock):
+        return client_sock.recv(1).decode('utf-8')
+
+
+
+
+    def __receive_client_message(self, client_sock, client_id):
+        raw_msg = client_sock.recv(self.MAX_BATCH_SIZE).rstrip()
+
+        if str(raw_msg[0]) == '4': # TODO: No es probable, pero el largo del nombre podría empezar con 0x04 y generar problemas
+            return [], True
+        else:
+            batch = self.__deserialize_batch(raw_msg, client_id)
+            return batch, False
+
+
+
+
+    def __deserialize_batch(self, raw_batch, client_id):
         seek = 0
         n_bets_in_batch = int.from_bytes(raw_batch[seek:seek+4], 'big')
         seek += 4
@@ -90,10 +129,29 @@ class Server:
             number = int.from_bytes(raw_batch[seek : seek+4], 'big')
             seek += 4
 
-            bet = Bet("0", first_name, last_name, str(document), birthdate, str(number))
+            bet = Bet(client_id, first_name, last_name, str(document), birthdate, str(number))
+            # logging.debug(f"APUESTA DE {client_id}: {bet.first_name}, {bet.last_name}")
             batch.append(bet)
 
         return batch
+
+
+
+
+    def __handle_lottery_end(self, client_sock):
+        client_id = self.__receive_client_id(client_sock)
+
+        all_bets = load_bets()
+        agency_winners = 0
+        for bet in all_bets:
+            if bet.agency == int(client_id) and has_won(bet): agency_winners += 1
+
+        agency_winners_bytes = agency_winners.to_bytes(4, 'big')
+
+        client_sock.send(agency_winners_bytes)
+
+
+
 
     def die(self):
         logging.info('action: shutdown_socket | result: in_progress')
