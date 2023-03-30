@@ -2,7 +2,6 @@ package common
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -54,7 +53,11 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (self *Client) SendBets(bets []Bet) {
+func (self *Client) ParticipateInLottery(bets []Bet) {
+	self.sendAllBets(bets)
+}
+
+func (self *Client) sendAllBets(bets []Bet) {
 	log.Infof("SEND %d BETS IN BATCHES OF %dkB", len(bets), self.config.MaxBatchBytes)
 
 	totalSentBets := 0
@@ -64,7 +67,6 @@ func (self *Client) SendBets(bets []Bet) {
 		if err != nil {
 			log.Errorf("action: enviar_batch | result: fail | err: %v", err)
 			// Posiblemente notificar error al server
-			return
 		} else {
 			totalSentBets += sentBets
 		}
@@ -72,6 +74,7 @@ func (self *Client) SendBets(bets []Bet) {
 }
 
 func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
+	// Serialize batch
 	batch := []byte{}
 
 	currentBet := batchStart
@@ -87,26 +90,67 @@ func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
 	}
 
 	betsInBatch := currentBet - batchStart
+	betsInBatchBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(betsInBatchBytes, uint32(betsInBatch))
+
+	batch = append(betsInBatchBytes, batch...)
+
+	log.Debugf(
+		"BATCH OF %d ENTRIES, SIZE %v",
+		binary.BigEndian.Uint32(batch[0:4]),
+		len(batch),
+	)
+
+	// Send batch
+	self.createClientSocket()
+	nSent, err := self.conn.Write(batch)
+	self.conn.Close()
+
+	if nSent != len(batch) {
+		log.Errorf("action: send_batch | result: fail | short write: sent %v expected %v",
+			self.config.ID,
+			nSent,
+			len(batch),
+		)
+		return betsInBatch, err
+	}
 
 	return betsInBatch, nil
 }
 
 func (self *Client) serializeBet(bet Bet) []byte {
-	buffer := new(bytes.Buffer)
+	serializedBet := []byte {}
 
-	binary.Write(buffer, bytes.BigEndian, len(bet.FirstName))
-	binary.Write(buffer, bytes.BigEndian, bet.FirstName)
+	firstNameLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(firstNameLenBytes, uint32(len(bet.FirstName)))
+	serializedBet = append(serializedBet, firstNameLenBytes...)
 
-	binary.Write(buffer, bytes.BigEndian, len(bet.LastName))
-	binary.Write(buffer, bytes.BigEndian, bet.LastName)
+	firstNameBytes := []byte(bet.FirstName)
+	serializedBet = append(serializedBet, firstNameBytes...)
 
-	binary.Write(buffer, bytes.BigEndian, len(bet.Birthdate))
-	binary.Write(buffer, bytes.BigEndian, bet.Birthdate)
+	lastNameLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(lastNameLenBytes, uint32(len(bet.LastName)))
+	serializedBet = append(serializedBet, lastNameLenBytes...)
 
-	binary.Write(buffer, bytes.BigEndian, bet.Document)
-	binary.Write(buffer, bytes.BigEndian, bet.Number)
+	lastNameBytes := []byte(bet.LastName)
+	serializedBet = append(serializedBet, lastNameBytes...)
 
-	return buffer.Bytes()
+	birthdateLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(birthdateLenBytes, uint32(len(bet.Birthdate)))
+	serializedBet = append(serializedBet, birthdateLenBytes...)
+
+	birthdateBytes := []byte(bet.Birthdate)
+	serializedBet = append(serializedBet, birthdateBytes...)
+
+	documentBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(documentBytes, uint32(bet.Document))
+	serializedBet = append(serializedBet, documentBytes...)
+
+	numberBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(numberBytes, uint32(bet.Number))
+	serializedBet = append(serializedBet, numberBytes...)
+
+	return serializedBet
 }
 
 func (self *Client) _SendBet(bet Bet) bool {

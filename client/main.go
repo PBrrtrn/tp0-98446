@@ -123,5 +123,5 @@ func main() {
 	}
 
 	client := common.NewClient(clientConfig)
-	client.SendBets(bets)
+	client.ParticipateInLottery(bets)
 }
