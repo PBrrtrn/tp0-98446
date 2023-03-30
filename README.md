@@ -133,3 +133,21 @@ La Parte 2 requiere una sección donde se explique el protocolo de comunicación
 La Parte 3 requiere una sección que expliquen los mecanismos de sincronización utilizados.
 
 Finalmente, se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección provistos [en el campus](https://campusgrado.fi.uba.ar/mod/page/view.php?id=73393).
+
+# Resolucion de los ejercicios
+
+## Parte 1
+
+### Ejercicio 1
+Para ejecutar el ejercicio 1, basta con ejecutar `make docker-compose-up`, ya que el segundo cliente ya se encuentra definido en el docker-compose.
+
+### Ejercicio 1.1
+Para crear el archivo docker-compose con multiples clientes, se debe ejecutar el script provisto con el comando `python3 create_docker_compose_definition {N_CLIENTES}`, y luego se podrá poner a correr los N_CLIENTES containers con `make docker-compose-up`
+
+### Ejercicio 2
+La solución se encuentra integrada al docker-compose, y se levantarán los volumenes al iniciar
+
+### Ejercicio 3
+Para ejecutar la prueba, primero hacer build de la imagen del dockerfile de netcat-test con el script de makefile ejecutando `make docker-image-test`. Luego, la prueba podrá ejecutarse con `make docker-compose-test test-string={TEST_STRING}`.
+
+La prueba correrá con el string provisto e imprimirá el resultado por consola
