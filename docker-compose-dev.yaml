@@ -11,7 +11,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - client:/client
+      - ./server:/server
 
   client1:
     container_name: client1
@@ -25,7 +25,7 @@ services:
     depends_on:
       - server
     volumes:
-      - server:/server
+      - ./client:/config
 
 networks:
   testing_net:
