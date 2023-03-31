@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bufio"
 	"encoding/binary"
 	"net"
 	"time"
@@ -11,6 +10,8 @@ import (
 
 const SERIALIZED_BET_LEN = 98
 const BATCH_SIZE_INDICATOR_LEN = 4
+const N_WINNERS_BYTES_LEN = 4
+const SERVER_BATCH_CONFIRMATION_LEN = 3
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
@@ -24,7 +25,7 @@ type ClientConfig struct {
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
-	conn   net.Conn
+	socket *Socket
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -48,7 +49,8 @@ func (c *Client) createClientSocket() error {
 			err,
 		)
 	}
-	c.conn = conn
+
+	c.socket = NewSocket(conn)
 	return nil
 }
 
@@ -58,12 +60,12 @@ func (self *Client) ParticipateInLottery(bets []Bet) {
 	self.sendAllBets(bets)
 	self.notifyFinishedSending()
 	self.receiveLotteryWinners()
-	self.conn.Close()
+	self.socket.Close()
 }
 
 func (self *Client) sendId() {
 	idByte := []byte(self.config.ID)
-	self.conn.Write(idByte)
+	self.socket.Send(idByte)
 }
 
 func (self *Client) sendAllBets(bets []Bet) {
@@ -82,14 +84,12 @@ func (self *Client) sendAllBets(bets []Bet) {
 
 func (self *Client) notifyFinishedSending() {
 	delimiterByte := []byte {4}
-	self.conn.Write(delimiterByte) // TODO: Chequear short write?
+	self.socket.Send(delimiterByte)
 }
 
 func (self *Client) receiveLotteryWinners() {
 	self.sendId()
-
-	nWinnersBytes := make([]byte, 4)
-	self.conn.Read(nWinnersBytes) // TODO: Manejar short-read y errores
+	nWinnersBytes, _ := self.socket.Receive(N_WINNERS_BYTES_LEN)
 
 	nWinners := binary.BigEndian.Uint32(nWinnersBytes)
 	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", nWinners)
@@ -122,18 +122,13 @@ func (self *Client) sendBatch(bets []Bet, batchStart int) (int, error) {
 
 	batch = append(betsInBatchBytes, batch...)
 
-	// Send batch
-	nSent, err := self.conn.Write(batch)
-	bufio.NewReader(self.conn).ReadString('\n')
-
-	if nSent != len(batch) {
-		log.Errorf("action: send_batch | result: fail | short write: sent %v expected %v",
-			self.config.ID,
-			nSent,
-			len(batch),
-		)
+	err := self.socket.Send(batch)
+	if err != nil {
+		log.Errorf("action: send_batch | result: fail | error: %v", err)
 		return betsInBatch, err
 	}
+
+	self.socket.Receive(SERVER_BATCH_CONFIRMATION_LEN);
 
 	return betsInBatch, nil
 }
