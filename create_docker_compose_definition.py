@@ -32,7 +32,9 @@ for i in range(1, n_clients + 1):
 	"    networks:\n" + \
 	"      - testing_net\n" + \
 	"    depends_on:\n" + \
-	"      - server\n"
+	"      - server\n" + \
+	"    volumes:\n" + \
+	"      - ./client/.data:/data\n"
 
 compose += "\n" + \
 "networks:\n" + \
@@ -41,6 +43,10 @@ compose += "\n" + \
 "      driver: default\n" + \
 "      config:\n" + \
 "        - subnet: 172.25.125.0/24\n"
+
+compose += "\n" + \
+"volumes:\n" + \
+"  client:\n"
 
 with open('docker-compose-dev.yaml', 'w') as f:
 	f.write(compose)
