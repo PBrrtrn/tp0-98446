@@ -2,6 +2,8 @@
 
 from configparser import ConfigParser
 from common.server import Server
+from common.filesystem_storage import FilesystemStorage
+
 import signal
 import logging
 import os
@@ -50,7 +52,8 @@ def main():
 
     # Initialize server and start server loop
 
-    server = Server(port, listen_backlog)
+    storage = FilesystemStorage()
+    server = Server(port, listen_backlog, storage)
     signal.signal(signal.SIGTERM, lambda _signum, _stackf: server.die() )
     server.run()
 

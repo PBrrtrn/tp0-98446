@@ -3,7 +3,6 @@ package common
 import (
 	"bufio"
 	"encoding/binary"
-	"fmt"
 	"net"
 	"time"
 
@@ -87,7 +86,6 @@ func (self *Client) notifyFinishedSending() {
 }
 
 func (self *Client) receiveLotteryWinners() {
-	log.Debugf("Asking for lottery winners")
 	self.sendId()
 
 	nWinnersBytes := make([]byte, 4)

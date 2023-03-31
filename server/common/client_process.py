@@ -2,13 +2,12 @@ import logging
 import multiprocessing
 
 from common.utils import Bet
-from common.utils import store_bets
 
 class ClientProcess:
     MAX_BATCH_SIZE = 8000
 
-    def __init__(self, socket):
-        self._process = multiprocessing.Process(target=self.__handle_client_connection, args=(socket,))
+    def __init__(self, socket, storage):
+        self._process = multiprocessing.Process(target=self.__handle_client_connection, args=(socket, storage,))
         self._server_pipe, self._client_pipe = multiprocessing.Pipe(duplex=True)
 
     def run(self):
@@ -32,10 +31,10 @@ class ClientProcess:
     def _send_to_server(self, msg):
         self._client_pipe.send(msg)
 
-    def __handle_client_connection(self, socket):
+    def __handle_client_connection(self, socket, storage):
         client_id = self.__receive_client_id(socket)
         bets = self.__receive_bets(socket, client_id)
-        store_bets(bets)
+        storage.store_bets(bets)
         self._send_to_server(client_id) # Notify finished
 
         winners = self._recv_from_server() # Get winners when ready
@@ -114,9 +113,8 @@ class ClientProcess:
 
 
     def __handle_lottery_end(self, client_sock, winners):
-        logging.debug(f"CLIENT PROCESS WINNERS: {winners}")
-
         client_id = self.__receive_client_id(client_sock)
+
         agency_winners = winners.get(int(client_id), 0)
         agency_winners_bytes = agency_winners.to_bytes(4, 'big')
         client_sock.send(agency_winners_bytes)
