@@ -6,7 +6,7 @@ from common.utils import Bet
 from common.utils import store_bets, load_bets, has_won
 
 class Server:
-    N_CLIENTS = 1
+    N_CLIENTS = 5
 
     def __init__(self, port, listen_backlog):
         # Initialize server socket
