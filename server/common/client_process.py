@@ -65,16 +65,64 @@ class ClientProcess:
 
 
 
-    def __receive_client_message(self, client_sock, client_id):
-        raw_msg = client_sock.recv(self.MAX_BATCH_SIZE).rstrip()
+    # def __receive_client_message(self, client_sock, client_id):
+    #     raw_msg = client_sock.recv(self.MAX_BATCH_SIZE).rstrip()
 
-        if str(raw_msg[0]) == '4': # TODO: Arreglar. No es probable, pero el largo del nombre podría empezar con 0x04 y generar problemas
+    #     if str(raw_msg[0]) == '4': # TODO: Arreglar. No es probable, pero el largo del nombre podría empezar con 0x04 y generar problemas
+    #         return [], True
+    #     else:
+    #         batch = self.__deserialize_batch(raw_msg, client_id)
+    #         return batch, False
+
+    def __receive_client_message(self, client_sock, client_id):
+        first_byte = client_sock.recv(1)
+
+        if str(first_byte[0]) == '4': # TODO: Arreglar. No es probable, pero el largo del nombre podría empezar con 0x04 y generar problemas
             return [], True
         else:
-            batch = self.__deserialize_batch(raw_msg, client_id)
+            remaining_bytes = client_sock.recv(3)
+            n_bets_in_batch_raw = first_byte + remaining_bytes
+            n_bets_in_batch = int.from_bytes(n_bets_in_batch_raw, 'big')
+
+            batch = self.__receive_batch(client_sock, n_bets_in_batch, client_id)
             return batch, False
 
 
+
+    def __receive_batch(self, client_sock, n_bets_in_batch, client_id):
+        batch = []
+        for _ in range(n_bets_in_batch):
+            bet = self.__receive_bet(client_sock, client_id)
+            batch.append(bet)
+
+        return batch
+
+
+
+    def __receive_bet(self, client_sock, client_id):
+        first_name_len = self.__receive_int(client_sock)
+        first_name = self.__receive_string(client_sock, first_name_len)
+
+        last_name_len = self.__receive_int(client_sock)
+        last_name = self.__receive_string(client_sock, last_name_len)
+
+        birthdate_len = self.__receive_int(client_sock)
+        birthdate = self.__receive_string(client_sock, birthdate_len)
+
+        document = self.__receive_int(client_sock)
+        number = self.__receive_int(client_sock)
+
+        return Bet(client_id, first_name, last_name, str(document), birthdate, str(number))
+
+
+    def __receive_int(self, client_sock):
+        int_bytes = client_sock.recv(4)
+        return int.from_bytes(int_bytes, 'big')
+
+
+    def __receive_string(self, client_sock, string_len):
+        raw_string = client_sock.recv(string_len)
+        return raw_string.decode('utf-8')
 
 
     def __deserialize_batch(self, raw_batch, client_id):

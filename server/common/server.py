@@ -2,6 +2,7 @@ import socket
 import logging
 
 from common.client_process import ClientProcess
+from common.socket import Socket
 from common.utils import Bet
 from common.utils import has_won
 
@@ -53,8 +54,9 @@ class Server:
         # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
         c, addr = self._server_socket.accept()
+        socket = Socket(c)
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
-        return c
+        return socket
 
 
 
