@@ -85,6 +85,8 @@ func (self *Client) sendAllBets(bets []Bet) {
 func (self *Client) notifyFinishedSending() {
 	delimiterByte := []byte {4}
 	self.socket.Send(delimiterByte)
+
+	self.socket.Receive(SERVER_BATCH_CONFIRMATION_LEN);
 }
 
 func (self *Client) receiveLotteryWinners() {

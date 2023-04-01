@@ -35,6 +35,7 @@ class ClientProcess:
         client_id = self.__receive_client_id(socket)
         bets = self.__receive_bets(socket, client_id)
         storage.store_bets(bets)
+
         self._send_to_server(client_id) # Notify finished
 
         winners = self._recv_from_server() # Get winners when ready
@@ -52,11 +53,11 @@ class ClientProcess:
             bets = []
             while True:
                 batch, finished = self.__receive_client_message(socket, client_id)
+                socket.send("OK\n".encode('utf-8'))
                 if finished:
                     return bets
                 else:
                     bets += batch
-                    socket.send("OK\n".encode('utf-8'))
 
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
